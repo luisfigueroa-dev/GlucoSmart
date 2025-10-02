@@ -1,0 +1,23 @@
+name: glucosmart
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.6.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  supabase_flutter: ^2.10.1
+  flutter_local_notifications: ^16.0.0  
+  flutter_logs: ^2.1.0
+  flutter_dotenv: ^5.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
