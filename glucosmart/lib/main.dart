@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_logs/flutter_logs.dart';
 import 'package:provider/provider.dart';
 import 'repositories/glucose_repo.dart';
 import 'providers/glucose_provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/home_screen.dart';
+import 'utils/notification_util.dart';
+import 'repositories/notification_repo.dart';
+import 'providers/notification_provider.dart';
 
 // Instancias globales para acceso directo
 final supabase = Supabase.instance.client;
-final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,10 +29,11 @@ void main() async {
     anonKey: supabaseAnonKey,
   );
 
-  // Inicializar notificaciones locales
-  const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const InitializationSettings initSettings = InitializationSettings(android: androidSettings);
-  await _localNotifications.initialize(initSettings);
+  // Inicializar NotificationUtil: configura notificaciones locales y WorkManager
+  // Lógica compleja: NotificationUtil.initialize() registra el callback de WorkManager
+  // y configura los plugins necesarios para notificaciones en segundo plano.
+  final notificationUtil = NotificationUtil();
+  await notificationUtil.initialize();
 
   // Inicializar logs para debugging
   await FlutterLogs.initLogs(
@@ -48,6 +50,8 @@ void main() async {
 
   runApp(
     // Envolver la app con MultiProvider para estado global
+    // Lógica compleja: Se proporcionan repositorios y providers para inyección de dependencias,
+    // permitiendo acceso a servicios de notificaciones, glucosa y autenticación en toda la app.
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
@@ -55,6 +59,14 @@ void main() async {
         ChangeNotifierProxyProvider<AuthProvider, GlucoseProvider>(
           create: (context) => GlucoseProvider(Provider.of<GlucoseRepository>(context, listen: false)),
           update: (context, auth, previous) => previous ?? GlucoseProvider(Provider.of<GlucoseRepository>(context, listen: false)),
+        ),
+        Provider(create: (_) => NotificationRepository(supabase)),
+        Provider(create: (_) => notificationUtil),
+        ChangeNotifierProvider(
+          create: (context) => NotificationProvider(
+            Provider.of<NotificationRepository>(context, listen: false),
+            Provider.of<NotificationUtil>(context, listen: false),
+          ),
         ),
       ],
       child: const GlucoApp(),
