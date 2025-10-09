@@ -32,6 +32,22 @@ class MedicationProvider extends ChangeNotifier {
   /// Getter para el mensaje de error.
   String? get error => _error;
 
+  /// Carga todas las dosis de medicamentos para un usuario.
+  Future<void> loadAll(String userId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _entries = await _repository.getAll(userId);
+    } catch (e) {
+      _error = 'Error al cargar dosis: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   /// Carga las dosis de medicamentos de los últimos 7 días para un usuario.
   /// Actualiza el estado interno y notifica a los listeners.
   /// Maneja errores capturándolos y almacenándolos en [_error].
@@ -81,6 +97,44 @@ class MedicationProvider extends ChangeNotifier {
     } catch (e) {
       // Captura errores de inserción.
       _error = 'Error al agregar dosis: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Actualiza una dosis de medicamento existente.
+  Future<void> updateMedication(Medication medication) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final updatedMedication = await _repository.update(medication);
+      final index = _entries.indexWhere((m) => m.id == medication.id);
+      if (index != -1) {
+        _entries[index] = updatedMedication;
+        _entries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      }
+    } catch (e) {
+      _error = 'Error al actualizar dosis: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Elimina una dosis de medicamento.
+  Future<void> deleteMedication(String medicationId, String userId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repository.delete(medicationId, userId);
+      _entries.removeWhere((m) => m.id == medicationId);
+    } catch (e) {
+      _error = 'Error al eliminar dosis: $e';
     } finally {
       _isLoading = false;
       notifyListeners();

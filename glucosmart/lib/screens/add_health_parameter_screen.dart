@@ -1,27 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/glucose_provider.dart';
+import '../providers/health_parameter_provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/user_stats_provider.dart';
-import '../providers/gamification_provider.dart';
-import '../models/glucose.dart';
+import '../models/health_parameter.dart';
 
-/// Pantalla para agregar una nueva medición de glucosa.
-/// Incluye campos para valor, timestamp y notas opcionales.
-/// Implementa validación de formulario, integración con GlucoseProvider,
-/// accesibilidad WCAG 2.2 AA y navegación de vuelta tras guardar.
+/// Pantalla para agregar un nuevo parámetro de salud.
+/// Soporta múltiples tipos: peso, HbA1c, presión arterial, sueño.
+/// Incluye validación específica por tipo y accesibilidad WCAG 2.2 AA.
 /// Compatible con Dart 3.0 y null-safety.
-class AddGlucoseScreen extends StatefulWidget {
-  const AddGlucoseScreen({super.key});
+class AddHealthParameterScreen extends StatefulWidget {
+  const AddHealthParameterScreen({super.key});
 
   @override
-  State<AddGlucoseScreen> createState() => _AddGlucoseScreenState();
+  State<AddHealthParameterScreen> createState() => _AddHealthParameterScreenState();
 }
 
-class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
+class _AddHealthParameterScreenState extends State<AddHealthParameterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _valueController = TextEditingController();
   final _notesController = TextEditingController();
+  HealthParameterType _selectedType = HealthParameterType.weight;
   DateTime _selectedDateTime = DateTime.now();
 
   @override
@@ -31,11 +29,10 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
     super.dispose();
   }
 
-  /// Valida que el valor de glucosa sea un número positivo.
-  /// Retorna null si es válido, o un mensaje de error en caso contrario.
-  String? _validateGlucoseValue(String? value) {
+  /// Valida el valor basado en el tipo seleccionado.
+  String? _validateValue(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Por favor ingrese un valor de glucosa';
+      return 'Por favor ingrese un valor';
     }
     final doubleValue = double.tryParse(value);
     if (doubleValue == null) {
@@ -44,27 +41,39 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
     if (doubleValue <= 0) {
       return 'El valor debe ser mayor a 0';
     }
-    if (doubleValue > 1000) {
-      return 'Valor demasiado alto (máx. 1000 mg/dL)';
+
+    // Validaciones específicas por tipo
+    switch (_selectedType) {
+      case HealthParameterType.weight:
+        if (doubleValue > 500) return 'Peso demasiado alto (máx. 500 kg)';
+        break;
+      case HealthParameterType.hba1c:
+        if (doubleValue > 20) return 'HbA1c demasiado alta (máx. 20%)';
+        break;
+      case HealthParameterType.bloodPressure:
+        if (doubleValue > 300) return 'Presión demasiado alta (máx. 300 mmHg)';
+        break;
+      case HealthParameterType.sleepHours:
+        if (doubleValue > 24) return 'Horas de sueño demasiado altas (máx. 24)';
+        break;
     }
     return null;
   }
 
-  /// Muestra el selector de fecha y hora para el timestamp.
-  /// Actualiza [_selectedDateTime] con la selección del usuario.
+  /// Muestra el selector de fecha y hora.
   Future<void> _selectDateTime() async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: _selectedDateTime,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
-      helpText: 'Seleccione la fecha de la medición',
+      helpText: 'Seleccione la fecha del registro',
     );
     if (pickedDate != null) {
       final TimeOfDay? pickedTime = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.fromDateTime(_selectedDateTime),
-        helpText: 'Seleccione la hora de la medición',
+        helpText: 'Seleccione la hora del registro',
       );
       if (pickedTime != null) {
         setState(() {
@@ -80,18 +89,14 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
     }
   }
 
-  /// Guarda la nueva medición de glucosa.
-  /// Valida el formulario, crea la instancia de Glucose y la agrega vía provider.
-  /// Navega de vuelta si es exitoso, muestra error en caso contrario.
-  Future<void> _saveMeasurement() async {
+  /// Guarda el nuevo parámetro de salud.
+  Future<void> _saveParameter() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final glucoseProvider = Provider.of<GlucoseProvider>(context, listen: false);
-    final userStatsProvider = Provider.of<UserStatsProvider>(context, listen: false);
-    final gamificationProvider = Provider.of<GamificationProvider>(context, listen: false);
+    final healthProvider = Provider.of<HealthParameterProvider>(context, listen: false);
 
     if (authProvider.user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -101,26 +106,26 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
     }
 
     final value = double.parse(_valueController.text);
+    final unit = _getUnitForType(_selectedType);
     final notes = _notesController.text.isEmpty ? null : _notesController.text;
 
-    // Crear instancia de Glucose sin ID (se genera en BD)
-    final glucose = Glucose(
-      id: '', // Se asignará en el provider
+    final parameter = HealthParameter(
+      id: '',
       userId: authProvider.user!.id,
+      type: _selectedType,
       value: value,
+      unit: unit,
       timestamp: _selectedDateTime,
       notes: notes,
     );
 
     try {
-      await glucoseProvider.addMeasurement(glucose, gamificationProvider);
-      if (glucoseProvider.error == null) {
-        // Agregar puntos por registrar glucosa (compatibilidad con sistema anterior)
-        await userStatsProvider.addPoints(authProvider.user!.id, 10, 'Registro de glucosa');
+      await healthProvider.addParameter(parameter);
+      if (healthProvider.error == null) {
         Navigator.of(context).pop();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(glucoseProvider.error!)),
+          SnackBar(content: Text(healthProvider.error!)),
         );
       }
     } catch (e) {
@@ -130,13 +135,46 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
     }
   }
 
+  /// Retorna la unidad por defecto para el tipo.
+  String _getUnitForType(HealthParameterType type) {
+    return HealthParameter(id: '', userId: '', type: type, value: 0, timestamp: DateTime.now()).defaultUnit;
+  }
+
+  /// Retorna el hint text para el campo de valor basado en el tipo.
+  String _getHintForType(HealthParameterType type) {
+    switch (type) {
+      case HealthParameterType.weight:
+        return 'Ej: 70.5';
+      case HealthParameterType.hba1c:
+        return 'Ej: 5.2';
+      case HealthParameterType.bloodPressure:
+        return 'Ej: 120 (sistólica)';
+      case HealthParameterType.sleepHours:
+        return 'Ej: 8.0';
+    }
+  }
+
+  /// Retorna el label para el campo de valor basado en el tipo.
+  String _getLabelForType(HealthParameterType type) {
+    switch (type) {
+      case HealthParameterType.weight:
+        return 'Peso';
+      case HealthParameterType.hba1c:
+        return 'HbA1c';
+      case HealthParameterType.bloodPressure:
+        return 'Presión Arterial';
+      case HealthParameterType.sleepHours:
+        return 'Horas de Sueño';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agregar Medición de Glucosa'),
+        title: const Text('Agregar Parámetro de Salud'),
         actions: [
-          Consumer<GlucoseProvider>(
+          Consumer<HealthParameterProvider>(
             builder: (context, provider, child) {
               return IconButton(
                 icon: provider.isLoading
@@ -145,12 +183,12 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          semanticsLabel: 'Guardando medición',
+                          semanticsLabel: 'Guardando parámetro',
                         ),
                       )
                     : const Icon(Icons.save),
-                onPressed: provider.isLoading ? null : _saveMeasurement,
-                tooltip: 'Guardar medición',
+                onPressed: provider.isLoading ? null : _saveParameter,
+                tooltip: 'Guardar parámetro',
               );
             },
           ),
@@ -163,20 +201,45 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Campo para valor de glucosa
+              // Selector de tipo
               Semantics(
-                label: 'Campo para ingresar el valor de glucosa en mg/dL',
-                hint: 'Ingrese un número entre 1 y 1000',
+                label: 'Selector de tipo de parámetro de salud',
+                hint: 'Elija qué parámetro desea registrar',
+                child: DropdownButtonFormField<HealthParameterType>(
+                  value: _selectedType,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de Parámetro',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: HealthParameterType.values.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Text(_getLabelForType(type)),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedType = value;
+                      });
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Campo para valor
+              Semantics(
+                label: 'Campo para ingresar el valor del ${_getLabelForType(_selectedType).toLowerCase()}',
+                hint: _getHintForType(_selectedType),
                 child: TextFormField(
                   controller: _valueController,
-                  decoration: const InputDecoration(
-                    labelText: 'Valor de Glucosa (mg/dL)',
-                    hintText: 'Ej: 120',
-                    border: OutlineInputBorder(),
-                    suffixText: 'mg/dL',
+                  decoration: InputDecoration(
+                    labelText: '${_getLabelForType(_selectedType)} (${_getUnitForType(_selectedType)})',
+                    hintText: _getHintForType(_selectedType),
+                    border: const OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
-                  validator: _validateGlucoseValue,
+                  validator: _validateValue,
                   autofocus: true,
                   textInputAction: TextInputAction.next,
                 ),
@@ -184,7 +247,7 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
               const SizedBox(height: 16),
               // Campo para timestamp
               Semantics(
-                label: 'Campo para seleccionar fecha y hora de la medición',
+                label: 'Campo para seleccionar fecha y hora del registro',
                 hint: 'Toque para abrir el selector de fecha y hora',
                 child: InkWell(
                   onTap: _selectDateTime,
@@ -204,13 +267,13 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
               const SizedBox(height: 16),
               // Campo para notas
               Semantics(
-                label: 'Campo opcional para notas sobre la medición',
-                hint: 'Describa el contexto, como después de comer',
+                label: 'Campo opcional para notas sobre el registro',
+                hint: 'Describa el contexto del registro',
                 child: TextFormField(
                   controller: _notesController,
                   decoration: const InputDecoration(
                     labelText: 'Notas (opcional)',
-                    hintText: 'Ej: Después del desayuno',
+                    hintText: 'Ej: Medición matutina',
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 3,
@@ -221,18 +284,18 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
               // Botón de guardar
               SizedBox(
                 width: double.infinity,
-                child: Consumer<GlucoseProvider>(
+                child: Consumer<HealthParameterProvider>(
                   builder: (context, provider, child) {
                     return ElevatedButton(
-                      onPressed: provider.isLoading ? null : _saveMeasurement,
+                      onPressed: provider.isLoading ? null : _saveParameter,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       child: provider.isLoading
                           ? const CircularProgressIndicator(
-                              semanticsLabel: 'Guardando medición',
+                              semanticsLabel: 'Guardando parámetro',
                             )
-                          : const Text('Guardar Medición'),
+                          : const Text('Guardar Parámetro'),
                     );
                   },
                 ),

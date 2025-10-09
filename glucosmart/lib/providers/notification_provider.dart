@@ -1,7 +1,10 @@
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../models/notification.dart';
 import '../repositories/notification_repo.dart';
 import '../utils/notification_util.dart';
+import '../models/glucose.dart';
+import '../models/medication.dart';
 
 /// Provider para manejar el estado de las notificaciones.
 /// Utiliza ChangeNotifier para notificar cambios a los widgets escuchando.
@@ -181,5 +184,193 @@ class NotificationProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  /// Genera notificaciones inteligentes basadas en patrones de datos.
+  /// Analiza glucosa, medicación y actividad para crear alertas relevantes.
+  ///
+  /// [glucoseData] Lista de mediciones de glucosa recientes
+  /// [medicationData] Lista de dosis de medicación recientes
+  /// [userId] ID del usuario
+  Future<void> generateSmartNotifications({
+    required List<Glucose> glucoseData,
+    required List<Medication> medicationData,
+    required String userId,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final smartNotifications = <Notification>[];
+
+      // 1. Notificaciones basadas en patrones de glucosa
+      final glucosePatterns = _analyzeGlucosePatterns(glucoseData);
+      smartNotifications.addAll(_createGlucoseBasedNotifications(glucosePatterns, userId));
+
+      // 2. Recordatorios de medicación
+      smartNotifications.addAll(_createMedicationReminders(medicationData, userId));
+
+      // 3. Notificaciones de tendencias
+      final trendNotifications = _analyzeTrends(glucoseData, medicationData);
+      smartNotifications.addAll(trendNotifications);
+
+      // Programar todas las notificaciones inteligentes
+      for (final notification in smartNotifications) {
+        await scheduleNotification(notification);
+      }
+
+    } catch (e) {
+      _error = 'Error al generar notificaciones inteligentes: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Analiza patrones en los datos de glucosa.
+  Map<String, dynamic> _analyzeGlucosePatterns(List<Glucose> glucoseData) {
+    if (glucoseData.isEmpty) return {};
+
+    final values = glucoseData.map((g) => g.value).toList();
+    final avgGlucose = values.reduce((a, b) => a + b) / values.length;
+
+    final highs = values.where((v) => v > 180).length;
+    final lows = values.where((v) => v < 70).length;
+    final normals = values.where((v) => v >= 70 && v <= 140).length;
+
+    // Calcular variabilidad (desviación estándar aproximada)
+    final variance = values.map((v) => (v - avgGlucose) * (v - avgGlucose)).reduce((a, b) => a + b) / values.length;
+    final variability = variance > 0 ? math.sqrt(variance) : 0.0;
+
+    return {
+      'avgGlucose': avgGlucose,
+      'highCount': highs,
+      'lowCount': lows,
+      'normalCount': normals,
+      'variability': variability,
+      'totalReadings': values.length,
+    };
+  }
+
+  /// Crea notificaciones basadas en patrones de glucosa.
+  List<Notification> _createGlucoseBasedNotifications(Map<String, dynamic> patterns, String userId) {
+    final notifications = <Notification>[];
+
+    if (patterns.isEmpty) return notifications;
+
+    final avgGlucose = patterns['avgGlucose'] as double;
+    final highCount = patterns['highCount'] as int;
+    final lowCount = patterns['lowCount'] as int;
+    final variability = patterns['variability'] as double;
+
+    // Notificación de glucosa alta frecuente
+    if (highCount > 3) {
+      notifications.add(Notification(
+        id: '',
+        userId: userId,
+        title: 'Alerta: Glucosa frecuentemente alta',
+        body: 'Has tenido ${highCount} lecturas altas esta semana. Revisa tu alimentación y medicación.',
+        scheduledTime: DateTime.now().add(const Duration(hours: 2)),
+        type: NotificationType.glucose,
+        isActive: true,
+      ));
+    }
+
+    // Notificación de hipoglucemia frecuente
+    if (lowCount > 2) {
+      notifications.add(Notification(
+        id: '',
+        userId: userId,
+        title: 'Cuidado: Hipoglucemia frecuente',
+        body: 'Has tenido ${lowCount} lecturas bajas. Ajusta tus dosis de insulina y monitorea de cerca.',
+        scheduledTime: DateTime.now().add(const Duration(hours: 1)),
+        type: NotificationType.glucose,
+        isActive: true,
+      ));
+    }
+
+    // Notificación de alta variabilidad
+    if (variability > 50) {
+      notifications.add(Notification(
+        id: '',
+        userId: userId,
+        title: 'Glucosa inestable',
+        body: 'Tu glucosa varía mucho. Intenta mantener rutinas más consistentes.',
+        scheduledTime: DateTime.now().add(const Duration(hours: 4)),
+        type: NotificationType.glucose,
+        isActive: true,
+      ));
+    }
+
+    return notifications;
+  }
+
+  /// Crea recordatorios de medicación basados en patrones.
+  List<Notification> _createMedicationReminders(List<Medication> medicationData, String userId) {
+    final notifications = <Notification>[];
+
+    // Recordatorios diarios para medicamentos comunes
+    final now = DateTime.now();
+    final tomorrow = now.add(const Duration(days: 1));
+
+    // Recordatorio de insulina basal (asumiendo mañana temprano)
+    notifications.add(Notification(
+      id: '',
+      userId: userId,
+      title: 'Recordatorio: Insulina basal',
+      body: 'No olvides tu dosis de insulina basal mañana por la mañana.',
+      scheduledTime: DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 8, 0),
+      type: NotificationType.medication,
+      isActive: true,
+    ));
+
+    // Recordatorio de medición de glucosa
+    notifications.add(Notification(
+      id: '',
+      userId: userId,
+      title: 'Hora de medir glucosa',
+      body: 'Es momento de verificar tus niveles de azúcar en sangre.',
+      scheduledTime: now.add(const Duration(hours: 2)),
+      type: NotificationType.glucose,
+      isActive: true,
+    ));
+
+    return notifications;
+  }
+
+  /// Analiza tendencias y crea notificaciones preventivas.
+  List<Notification> _createTrendNotifications(List<Glucose> glucoseData, List<Medication> medicationData) {
+    final notifications = <Notification>[];
+
+    if (glucoseData.length < 7) return notifications;
+
+    // Tendencia alcista en glucosa
+    final recent = glucoseData.take(3).map((g) => g.value).toList();
+    final older = glucoseData.skip(3).take(3).map((g) => g.value).toList();
+
+    if (recent.isNotEmpty && older.isNotEmpty) {
+      final recentAvg = recent.reduce((a, b) => a + b) / recent.length;
+      final olderAvg = older.reduce((a, b) => a + b) / older.length;
+
+      if (recentAvg > olderAvg + 20) {
+        notifications.add(Notification(
+          id: '',
+          userId: glucoseData.first.userId,
+          title: 'Tendencia: Glucosa aumentando',
+          body: 'Tu glucosa ha aumentado últimamente. Revisa posibles causas.',
+          scheduledTime: DateTime.now().add(const Duration(hours: 3)),
+          type: NotificationType.glucose,
+          isActive: true,
+        ));
+      }
+    }
+
+    return notifications;
+  }
+
+  /// Método auxiliar para analizar tendencias.
+  List<Notification> _analyzeTrends(List<Glucose> glucoseData, List<Medication> medicationData) {
+    return _createTrendNotifications(glucoseData, medicationData);
   }
 }

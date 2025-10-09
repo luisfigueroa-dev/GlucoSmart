@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/glucose.dart';
 import '../repositories/glucose_repo.dart';
+import 'gamification_provider.dart';
 
 /// Provider para manejar el estado de las mediciones de glucosa.
 /// Utiliza ChangeNotifier para notificar cambios a los widgets escuchando.
@@ -57,11 +58,13 @@ class GlucoseProvider extends ChangeNotifier {
 
   /// Agrega una nueva medición de glucosa.
   /// Inserta en la base de datos y actualiza la lista local si es exitoso.
+  /// Registra la acción en gamificación para otorgar puntos.
   /// Notifica cambios para actualizar la UI.
   /// Maneja errores de inserción.
   ///
   /// [glucose] La nueva medición a agregar (sin ID, se genera en BD).
-  Future<void> addMeasurement(Glucose glucose) async {
+  /// [gamificationProvider] Provider de gamificación para registrar acciones.
+  Future<void> addMeasurement(Glucose glucose, [GamificationProvider? gamificationProvider]) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -78,6 +81,11 @@ class GlucoseProvider extends ChangeNotifier {
       // Esto mantiene la consistencia con el orden del repositorio.
       _measurements.insert(0, newGlucose);
       _measurements.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      // Registra acción en gamificación si el provider está disponible
+      if (gamificationProvider != null) {
+        await gamificationProvider.registerGlucoseMeasurement(glucose.userId);
+      }
     } catch (e) {
       // Captura errores de inserción.
       _error = 'Error al agregar medición: $e';

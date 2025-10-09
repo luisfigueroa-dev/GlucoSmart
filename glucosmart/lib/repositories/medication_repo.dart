@@ -38,6 +38,24 @@ class MedicationRepository {
     }
   }
 
+  /// Obtiene todas las dosis de medicamentos para un usuario específico.
+  /// Ordena los resultados por timestamp descendente.
+  Future<List<Medication>> getAll(String userId) async {
+    try {
+      final response = await _supabaseClient
+          .from('medications')
+          .select()
+          .eq('user_id', userId)
+          .order('timestamp', ascending: false);
+
+      return (response as List<dynamic>)
+          .map((json) => Medication.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw Exception('Error al obtener todas las dosis: $e');
+    }
+  }
+
   /// Obtiene las dosis de medicamentos de los últimos 7 días para un usuario específico.
   /// Ordena los resultados por timestamp descendente.
   /// Maneja errores de consulta y parsing de datos.
@@ -60,6 +78,36 @@ class MedicationRepository {
           .toList();
     } catch (e) {
       throw Exception('Error al obtener dosis de los últimos 7 días: $e');
+    }
+  }
+
+  /// Actualiza una dosis de medicamento existente.
+  Future<Medication> update(Medication medication) async {
+    try {
+      final response = await _supabaseClient
+          .from('medications')
+          .update(medication.toJson())
+          .eq('id', medication.id)
+          .eq('user_id', medication.userId)
+          .select()
+          .single();
+
+      return Medication.fromJson(response as Map<String, dynamic>);
+    } catch (e) {
+      throw Exception('Error al actualizar dosis: $e');
+    }
+  }
+
+  /// Elimina una dosis de medicamento por ID.
+  Future<void> delete(String medicationId, String userId) async {
+    try {
+      await _supabaseClient
+          .from('medications')
+          .delete()
+          .eq('id', medicationId)
+          .eq('user_id', userId);
+    } catch (e) {
+      throw Exception('Error al eliminar dosis: $e');
     }
   }
 }

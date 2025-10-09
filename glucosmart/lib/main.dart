@@ -11,6 +11,21 @@ import 'screens/home_screen.dart';
 import 'utils/notification_util.dart';
 import 'repositories/notification_repo.dart';
 import 'providers/notification_provider.dart';
+import 'repositories/activity_repo.dart';
+import 'providers/activity_provider.dart';
+import 'repositories/health_parameter_repo.dart';
+import 'providers/health_parameter_provider.dart';
+import 'repositories/user_stats_repo.dart';
+import 'providers/user_stats_provider.dart';
+import 'repositories/personalized_plan_repo.dart';
+import 'providers/personalized_plan_provider.dart';
+import 'repositories/gamification_repo.dart';
+import 'providers/gamification_provider.dart';
+import 'screens/education_screen.dart';
+import 'screens/reports_screen.dart';
+import 'screens/share_screen.dart';
+import 'screens/personalized_plan_screen.dart';
+import 'screens/achievements_screen.dart';
 
 // Instancias globales para acceso directo
 final supabase = Supabase.instance.client;
@@ -68,6 +83,26 @@ void main() async {
             Provider.of<NotificationUtil>(context, listen: false),
           ),
         ),
+        Provider(create: (_) => ActivityRepository(supabase)),
+        ChangeNotifierProvider(
+          create: (context) => ActivityProvider(Provider.of<ActivityRepository>(context, listen: false)),
+        ),
+        Provider(create: (_) => HealthParameterRepository(supabase)),
+        ChangeNotifierProvider(
+          create: (context) => HealthParameterProvider(Provider.of<HealthParameterRepository>(context, listen: false)),
+        ),
+        Provider(create: (_) => PersonalizedPlanRepository(supabase)),
+        ChangeNotifierProvider(
+          create: (context) => PersonalizedPlanProvider(Provider.of<PersonalizedPlanRepository>(context, listen: false)),
+        ),
+        Provider(create: (_) => GamificationRepository(supabase)),
+        ChangeNotifierProvider(
+          create: (context) => GamificationProvider(Provider.of<GamificationRepository>(context, listen: false)),
+        ),
+        Provider(create: (_) => UserStatsRepository(supabase)),
+        ChangeNotifierProvider(
+          create: (context) => UserStatsProvider(Provider.of<UserStatsRepository>(context, listen: false)),
+        ),
       ],
       child: const GlucoApp(),
     ),
@@ -84,12 +119,12 @@ class GlucoApp extends StatelessWidget {
       // Configuración del tema con Material 3
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.teal,
+        colorSchemeSeed: Colors.blue,
         brightness: Brightness.light,
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Colors.teal,
+        colorSchemeSeed: Colors.blue,
         brightness: Brightness.dark,
       ),
       themeMode: ThemeMode.system,
@@ -108,7 +143,7 @@ class GlucoApp extends StatelessWidget {
       routes: {
         '/': (context) => const AuthWrapper(),
         '/login': (context) => const LoginPage(),
-        '/home': (context) => const HomeScreen(),
+        '/home': (context) => const MainNavigation(),
       },
       // Página de error para rutas no encontradas
       onUnknownRoute: (settings) => MaterialPageRoute(
@@ -161,9 +196,10 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _signIn() async {
     setState(() => _isLoading = true);
     try {
-      await supabase.auth.signInWithPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.signIn(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
       );
       // Navegación automática gracias al AuthProvider
     } catch (e) {
@@ -240,9 +276,31 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-// Página principal de la app
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+// Widget principal con navegación por tabs
+class MainNavigation extends StatefulWidget {
+  const MainNavigation({super.key});
+
+  @override
+  State<MainNavigation> createState() => _MainNavigationState();
+}
+
+class _MainNavigationState extends State<MainNavigation> {
+  int _selectedIndex = 0;
+
+  static const List<Widget> _widgetOptions = <Widget>[
+    HomeScreen(),
+    EducationScreen(),
+    PersonalizedPlanScreen(),
+    AchievementsScreen(),
+    ReportsScreen(),
+    ShareScreen(),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -250,26 +308,50 @@ class HomePage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('GlucoSmart - Inicio'),
+        title: const Text('GlucoSmart'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await authProvider.signOut();
-              // Navegación automática gracias al AuthProvider
             },
+            tooltip: 'Cerrar sesión',
           ),
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Bienvenido, ${authProvider.user?.email ?? 'Usuario'}'),
-            const SizedBox(height: 20),
-            const Text('Funcionalidades de GlucoSmart próximamente...'),
-          ],
-        ),
+      body: _widgetOptions.elementAt(_selectedIndex),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Inicio',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.school),
+            label: 'Educación',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.assignment),
+            label: 'Planes',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.emoji_events),
+            label: 'Logros',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.description),
+            label: 'Informes',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.share),
+            label: 'Compartir',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed, // Para mostrar todos los labels
+        showUnselectedLabels: false, // Ocultar labels no seleccionados para ahorrar espacio
       ),
     );
   }
