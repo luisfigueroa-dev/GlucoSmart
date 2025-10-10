@@ -28,7 +28,7 @@ class CarbsRepository {
     try {
       final response = await _supabaseClient
           .from('carbs')
-          .insert(carbs.toJson())
+          .insert(carbs.toJsonForInsert())
           .select('id')
           .single();
 

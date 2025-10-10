@@ -78,6 +78,19 @@ class HealthParameter {
     };
   }
 
+  /// Convierte la instancia a un mapa JSON para inserción en Supabase.
+  /// Excluye el ID ya que se genera automáticamente en la base de datos.
+  Map<String, dynamic> toJsonForInsert() {
+    return {
+      'user_id': userId,
+      'type': type.name,
+      'value': value,
+      'unit': unit,
+      'timestamp': timestamp.toIso8601String(),
+      'notes': notes,
+    };
+  }
+
   /// Retorna la unidad por defecto basada en el tipo.
   String get defaultUnit {
     switch (type) {

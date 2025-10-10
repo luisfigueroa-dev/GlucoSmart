@@ -52,7 +52,7 @@ class ActivityRepository {
     try {
       final response = await _supabase
           .from('activity')
-          .insert(activity.toJson())
+          .insert(activity.toJsonForInsert())
           .select()
           .single();
 

@@ -28,7 +28,7 @@ class GlucoseRepository {
     try {
       final response = await _supabaseClient
           .from('glucose')
-          .insert(glucose.toJson())
+          .insert(glucose.toJsonForInsert())
           .select('id')
           .single();
 

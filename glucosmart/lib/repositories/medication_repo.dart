@@ -6,11 +6,11 @@ import '../models/medication.dart';
 /// Incluye manejo de errores con try-catch y comentarios en español.
 ///
 /// Configuración recomendada en Supabase:
-/// - Tabla: medications
-/// - Columnas: id (uuid, primary key), user_id (uuid), name (text), dose (float8), unit (text), timestamp (timestamptz), type (text)
-/// - Índices: CREATE INDEX idx_medications_user_timestamp ON medications (user_id, timestamp DESC);
-/// - RLS: ALTER TABLE medications ENABLE ROW LEVEL SECURITY;
-///   Política: CREATE POLICY "Users can only access their own medications data" ON medications
+/// - Tabla: medication
+/// - Columnas: id (uuid, primary key), user_id (uuid), name (text), dose (numeric), unit (text), timestamp (timestamptz), type (text)
+/// - Índices: CREATE INDEX idx_medication_user_timestamp ON medication (user_id, timestamp DESC);
+/// - RLS: ALTER TABLE medication ENABLE ROW LEVEL SECURITY;
+///   Política: CREATE POLICY "Users can view own medication records" ON medication
 ///     FOR ALL USING (auth.uid() = user_id);
 class MedicationRepository {
   /// Constructor constante que recibe el cliente de Supabase.
@@ -27,8 +27,8 @@ class MedicationRepository {
   Future<String> insert(Medication medication) async {
     try {
       final response = await _supabaseClient
-          .from('medications')
-          .insert(medication.toJson())
+          .from('medication')
+          .insert(medication.toJsonForInsert())
           .select('id')
           .single();
 
@@ -43,7 +43,7 @@ class MedicationRepository {
   Future<List<Medication>> getAll(String userId) async {
     try {
       final response = await _supabaseClient
-          .from('medications')
+          .from('medication')
           .select()
           .eq('user_id', userId)
           .order('timestamp', ascending: false);
@@ -67,7 +67,7 @@ class MedicationRepository {
       final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
 
       final response = await _supabaseClient
-          .from('medications')
+          .from('medication')
           .select()
           .eq('user_id', userId)
           .gte('timestamp', sevenDaysAgo.toIso8601String())
@@ -85,7 +85,7 @@ class MedicationRepository {
   Future<Medication> update(Medication medication) async {
     try {
       final response = await _supabaseClient
-          .from('medications')
+          .from('medication')
           .update(medication.toJson())
           .eq('id', medication.id)
           .eq('user_id', medication.userId)
@@ -102,7 +102,7 @@ class MedicationRepository {
   Future<void> delete(String medicationId, String userId) async {
     try {
       await _supabaseClient
-          .from('medications')
+          .from('medication')
           .delete()
           .eq('id', medicationId)
           .eq('user_id', userId);

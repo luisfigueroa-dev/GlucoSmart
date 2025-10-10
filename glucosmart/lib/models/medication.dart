@@ -82,6 +82,19 @@ class Medication {
     };
   }
 
+  /// Convierte la instancia a un mapa JSON para inserción en Supabase.
+  /// Excluye el ID ya que se genera automáticamente en la base de datos.
+  Map<String, dynamic> toJsonForInsert() {
+    return {
+      'user_id': userId,
+      'name': name,
+      'dose': dose,
+      'unit': unit,
+      'timestamp': timestamp.toIso8601String(),
+      'type': type.name,  // Convierte enum a string
+    };
+  }
+
   /// Verifica si el medicamento es de tipo bolus.
   /// Útil para cálculos relacionados con comidas.
   bool isBolus() => type == MedicationType.bolus;

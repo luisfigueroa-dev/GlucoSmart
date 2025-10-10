@@ -70,6 +70,11 @@ class GlucoseProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Debug: verificar datos antes de insertar
+      print('GlucoseProvider: Inserting glucose - userId: "${glucose.userId}", value: ${glucose.value}');
+      final jsonData = glucose.toJson();
+      print('GlucoseProvider: JSON data: $jsonData');
+
       // Inserta la medición en la base de datos.
       // El ID se genera automáticamente en Supabase.
       final newId = await _repository.insert(glucose);

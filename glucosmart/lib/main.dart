@@ -21,6 +21,10 @@ import 'repositories/personalized_plan_repo.dart';
 import 'providers/personalized_plan_provider.dart';
 import 'repositories/gamification_repo.dart';
 import 'providers/gamification_provider.dart';
+import 'repositories/carbs_repo.dart';
+import 'providers/carbs_provider.dart';
+import 'repositories/medication_repo.dart';
+import 'providers/medication_provider.dart';
 import 'screens/education_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/share_screen.dart';
@@ -102,6 +106,14 @@ void main() async {
         Provider(create: (_) => UserStatsRepository(supabase)),
         ChangeNotifierProvider(
           create: (context) => UserStatsProvider(Provider.of<UserStatsRepository>(context, listen: false)),
+        ),
+        Provider(create: (_) => CarbsRepository(supabase)),
+        ChangeNotifierProvider(
+          create: (context) => CarbsProvider(Provider.of<CarbsRepository>(context, listen: false)),
+        ),
+        Provider(create: (_) => MedicationRepository(supabase)),
+        ChangeNotifierProvider(
+          create: (context) => MedicationProvider(Provider.of<MedicationRepository>(context, listen: false)),
         ),
       ],
       child: const GlucoApp(),
@@ -216,9 +228,10 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _signUp() async {
     setState(() => _isLoading = true);
     try {
-      await supabase.auth.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.signUp(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
       );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Registro exitoso. Revisa tu email para confirmar.')),

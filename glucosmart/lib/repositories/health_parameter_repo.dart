@@ -65,7 +65,7 @@ class HealthParameterRepository {
     try {
       final response = await _supabase
           .from('health_parameters')
-          .insert(parameter.toJson())
+          .insert(parameter.toJsonForInsert())
           .select()
           .single();
 

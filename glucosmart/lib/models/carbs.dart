@@ -50,6 +50,17 @@ class Carbs {
     };
   }
 
+  /// Convierte la instancia a un mapa JSON para inserción en Supabase.
+  /// Excluye el ID ya que se genera automáticamente en la base de datos.
+  Map<String, dynamic> toJsonForInsert() {
+    return {
+      'user_id': userId,
+      'grams': grams,
+      'timestamp': timestamp.toIso8601String(),
+      'food': food,
+    };
+  }
+
   /// Verifica si la cantidad de carbohidratos es considerada alta (>50g).
   /// Útil para alertas o categorización de entradas.
   bool isHigh() => grams > 50;

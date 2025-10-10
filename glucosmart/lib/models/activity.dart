@@ -62,6 +62,19 @@ class Activity {
     };
   }
 
+  /// Convierte la instancia a un mapa JSON para inserción en Supabase.
+  /// Excluye el ID ya que se genera automáticamente en la base de datos.
+  Map<String, dynamic> toJsonForInsert() {
+    return {
+      'user_id': userId,
+      'steps': steps,
+      'calories_burned': caloriesBurned,
+      'timestamp': timestamp.toIso8601String(),
+      'duration_minutes': durationMinutes,
+      'activity_type': activityType,
+    };
+  }
+
   /// Verifica si la actividad es considerada alta (>10000 pasos).
   /// Útil para alertas o categorización.
   bool isHighActivity() => steps > 10000;

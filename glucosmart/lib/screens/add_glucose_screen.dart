@@ -100,13 +100,31 @@ class _AddGlucoseScreenState extends State<AddGlucoseScreen> {
       return;
     }
 
+    // Debug: verificar que el user ID sea válido
+    final user = authProvider.user;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Usuario no encontrado')),
+      );
+      return;
+    }
+
+    final userId = user.id;
+    print('AddGlucoseScreen: User ID = "$userId"');
+    if (userId == null || userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ID de usuario inválido: "$userId"')),
+      );
+      return;
+    }
+
     final value = double.parse(_valueController.text);
     final notes = _notesController.text.isEmpty ? null : _notesController.text;
 
     // Crear instancia de Glucose sin ID (se genera en BD)
     final glucose = Glucose(
       id: '', // Se asignará en el provider
-      userId: authProvider.user!.id,
+      userId: userId,
       value: value,
       timestamp: _selectedDateTime,
       notes: notes,

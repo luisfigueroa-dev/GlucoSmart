@@ -50,6 +50,17 @@ class Glucose {
     };
   }
 
+  /// Convierte la instancia a un mapa JSON para inserción en Supabase.
+  /// Excluye el ID ya que se genera automáticamente en la base de datos.
+  Map<String, dynamic> toJsonForInsert() {
+    return {
+      'user_id': userId,
+      'value': value,
+      'timestamp': timestamp.toIso8601String(),
+      'notes': notes,
+    };
+  }
+
   /// Verifica si el valor de glucosa está en rango alto (>140 mg/dL).
   /// Útil para alertas o categorización de mediciones.
   bool isHigh() => value > 140.0;
